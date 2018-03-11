@@ -964,4 +964,10 @@ static inline long ksys_access(const char __user *filename, int mode)
 	return do_faccessat(AT_FDCWD, filename, mode, 0);
 }
 
+/*
+ * Kernel code should not call syscalls (i.e., sys_xyzyyz()) directly.
+ * Instead, use one of the functions which work equivalently, such as
+ * the ksys_xyzyyz() functions prototyped below.
+ */
+
 #endif
