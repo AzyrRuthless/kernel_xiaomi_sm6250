@@ -1283,7 +1283,6 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 
 	return retval;
 }
-EXPORT_SYMBOL(sys_close);
 
 /**
  * close_range() - Close all file descriptors in a given range.
