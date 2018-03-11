@@ -970,5 +970,6 @@ static inline long ksys_access(const char __user *filename, int mode)
 
 int ksys_mount(char __user *dev_name, char __user *dir_name, char __user *type,
 	       unsigned long flags, void __user *data);
+int ksys_umount(char __user *name, int flags);
 
 #endif
