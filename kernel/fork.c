@@ -2039,6 +2039,12 @@ static __latent_entropy struct task_struct *copy_process(
 	 */
 	copy_seccomp(p);
 
+	/* Don't start children in a dying pid namespace */
+	if (unlikely(!(ns_of_pid(pid)->nr_hashed & PIDNS_HASH_ADDING))) {
+		retval = -ENOMEM;
+		goto bad_fork_cancel_cgroup;
+	}
+
 	/*
 	 * Process group and session signals need to be delivered to just the
 	 * parent before the fork or both the parent and the child after the
@@ -2052,10 +2058,7 @@ static __latent_entropy struct task_struct *copy_process(
 		retval = -ERESTARTNOINTR;
 		goto bad_fork_cancel_cgroup;
 	}
-	if (unlikely(!(ns_of_pid(pid)->nr_hashed & PIDNS_HASH_ADDING))) {
-		retval = -ENOMEM;
-		goto bad_fork_cancel_cgroup;
-	}
+
 
 	/* past the last point of failure */
 	if (pidfile)
