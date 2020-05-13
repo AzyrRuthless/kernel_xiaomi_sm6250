@@ -340,6 +340,8 @@ static inline void seccomp_sync_threads(unsigned long flags)
 		 * allows a put before the assignment.)
 		 */
 		put_seccomp_filter(thread);
+		atomic_set(&thread->seccomp.filter_count,
+			   atomic_read(&caller->seccomp.filter_count));
 		smp_store_release(&thread->seccomp.filter,
 				  caller->seccomp.filter);
 
@@ -480,6 +482,7 @@ static long seccomp_attach_filter(unsigned int flags,
 	 */
 	filter->prev = current->seccomp.filter;
 	current->seccomp.filter = filter;
+	atomic_inc(&current->seccomp.filter_count);
 
 	/* Now that the new filter is in place, synchronize to all threads. */
 	if (flags & SECCOMP_FILTER_FLAG_TSYNC)
