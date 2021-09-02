@@ -455,6 +455,9 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg, bool tree,
 	struct vmpressure *vmpr = &global_vmpressure;
 	unsigned long flags;
 
+	if (mem_cgroup_disabled())
+		return;
+
 	if (order > PAGE_ALLOC_COSTLY_ORDER)
 		return;
 
