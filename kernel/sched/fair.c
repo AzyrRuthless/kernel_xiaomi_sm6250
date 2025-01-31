@@ -201,16 +201,21 @@ static inline u64 scale_slice(u64 delta, struct sched_entity *se) {
 }
 
 static void update_burst_score(struct sched_entity *se) {
-	if (!entity_is_task(se)) return;
-	struct task_struct *p = task_of(se);
-	u8 prio = p->static_prio - MAX_RT_PRIO;
-	u8 prev_prio = min(39, prio + se->burst_score);
+    if (!entity_is_task(se))
+        return;
 
-	se->burst_score = se->burst_penalty >> 2;
+    struct task_struct *p = task_of(se);
+    u8 prio = p->static_prio - MAX_RT_PRIO;
+    u8 prev_prio = min(39, prio + se->burst_score);
 
-	u8 new_prio = min(39, prio + se->burst_score);
-	if (new_prio != prev_prio)
-	 	reweight_task(p, new_prio);
+    se->burst_score = se->burst_penalty >> 2;
+
+    u8 new_prio = min(39, prio + se->burst_score);
+    if (new_prio != prev_prio) {
+#ifdef CONFIG_SCHED_BORE
+        reweight_task(p, new_prio);
+#endif
+    }
 }
 
 static void update_burst_penalty(struct sched_entity *se) {
@@ -2917,15 +2922,18 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 		account_entity_enqueue(cfs_rq, se);
 }
 
+#ifdef CONFIG_SCHED_BORE
 void reweight_task(struct task_struct *p, int prio)
 {
-	struct sched_entity *se = &p->se;
-	struct cfs_rq *cfs_rq = cfs_rq_of(se);
-	struct load_weight *load = &se->load;
-	unsigned long weight = scale_load(sched_prio_to_weight[prio]);
-	reweight_entity(cfs_rq, se, weight);
-	load->inv_weight = sched_prio_to_wmult[prio];
+        struct sched_entity *se = &p->se;
+        struct cfs_rq *cfs_rq = cfs_rq_of(se);
+        struct load_weight *load = &se->load;
+        unsigned long weight = scale_load(sched_prio_to_weight[prio]);
+
+        reweight_entity(cfs_rq, se, weight);
+        load->inv_weight = sched_prio_to_wmult[prio];
 }
+#endif // CONFIG_SCHED_BORE
 
 static inline int throttled_hierarchy(struct cfs_rq *cfs_rq);
 
