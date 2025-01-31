@@ -2917,6 +2917,7 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 		account_entity_enqueue(cfs_rq, se);
 }
 
+#ifdef CONFIG_SCHED_BORE
 void reweight_task(struct task_struct *p, int prio)
 {
 	struct sched_entity *se = &p->se;
@@ -2926,6 +2927,7 @@ void reweight_task(struct task_struct *p, int prio)
 	reweight_entity(cfs_rq, se, weight);
 	load->inv_weight = sched_prio_to_wmult[prio];
 }
+#endif // CONFIG_SCHED_BORE
 
 static inline int throttled_hierarchy(struct cfs_rq *cfs_rq);
 
