@@ -505,7 +505,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 
 	/*
 	 * Print the dentry name for named mappings, and a
-	 * special [heap] marker for the heap:
+	 * special [heap] marker for the heap.
 	 */
 	if (file) {
 		char *buf;
@@ -528,7 +528,23 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 					len = inlen - outlen - 1;
 				else
 					len = strlen(p);
-				memmove(buf, p, len);
+
+				// Modification: Spoof paths containing "memfd" or "(deleted)"
+				if (strstr(p, "memfd") || strstr(p, "(deleted)")) {
+					// Example: Replace "memfd:/system/framework/..." with "/system/framework/..."
+					if (strstr(p, "/system/framework/arm64/boot.oat")) {
+						const char *spoofed_path = "/system/framework/arm64/boot.oat";
+						strncpy(buf, spoofed_path, len);
+						len = strlen(spoofed_path);
+					} else {
+						// Alternative: Remove the entire entry for this path
+						return;
+					}
+				} else {
+					// If it does not contain "memfd" or "(deleted)", display the original path
+					memmove(buf, p, len);
+				}
+
 				buf[len] = '\n';
 				seq_commit(m, len + 1);
 				return;
