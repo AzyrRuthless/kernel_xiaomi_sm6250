@@ -286,7 +286,7 @@ static ssize_t nfc_write(struct file *filp, const char __user *buf,
 	while (retry_cnt < MAX_RETRY_COUNT && (ret = i2c_master_send(nqx_dev->client, tmp, count)) != count) {
 		dev_err(&nqx_dev->client->dev,
 				"%s: failed to write %d (retry_cnt = %d)\n", __func__, ret, retry_cnt);
-		usleep_range(10000, 11000);
+		usleep_range(1000, 1100);
 		retry_cnt++;
 	}
 
