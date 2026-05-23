@@ -420,7 +420,7 @@ static const char *proc_get_link(struct dentry *dentry,
 				 struct delayed_call *done)
 {
 	struct proc_dir_entry *pde = PDE(inode);
-	if (unlikely(!use_pde(pde)))
+	if (unlikely(!pde || !use_pde(pde)))
 		return ERR_PTR(-EINVAL);
 	set_delayed_call(done, proc_put_link, pde);
 	return pde->data;
