@@ -556,7 +556,7 @@ static int get_val(struct range_data *range, int hysteresis, int current_index,
 static void taper_fcc_step_chg(struct step_chg_info *chip, int index,
 					int current_voltage)
 {
-	u32 current_fcc, target_fcc;
+	int current_fcc, target_fcc;
 
 	if (index < 0) {
 		pr_err("Invalid STEP CHG index\n");
@@ -565,6 +565,12 @@ static void taper_fcc_step_chg(struct step_chg_info *chip, int index,
 
 	current_fcc = get_effective_result(chip->fcc_votable);
 	target_fcc = chip->step_chg_config->fcc_cfg[index].value;
+
+	if (current_fcc < 0) {
+		pr_debug("fcc_votable unavailable (rc=%d), using target\n",
+			 current_fcc);
+		current_fcc = target_fcc;
+	}
 
 	if (index == 0) {
 		vote(chip->fcc_votable, STEP_CHG_VOTER, true, target_fcc);
@@ -590,7 +596,7 @@ static void taper_fcc_step_chg(struct step_chg_info *chip, int index,
 		 * down FCC till previous index FCC configuration is reached.
 		 */
 		vote(chip->fcc_votable, STEP_CHG_VOTER, true,
-			max(chip->step_chg_config->fcc_cfg[index - 1].value,
+			max_t(int, chip->step_chg_config->fcc_cfg[index - 1].value,
 			current_fcc - TAPERED_STEP_CHG_FCC_REDUCTION_STEP_MA));
 	}
 }

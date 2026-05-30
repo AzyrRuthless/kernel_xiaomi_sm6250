@@ -409,6 +409,11 @@ static void split_settled(struct pl_data *chip)
 		return;
 	}
 
+	if (!chip->pl_psy) {
+		pr_debug("pl_psy unavailable, skipping parallel ICL set\n");
+		return;
+	}
+
 	/*
 	 * If there is an increase in slave share
 	 * (Also handles parallel enable case)

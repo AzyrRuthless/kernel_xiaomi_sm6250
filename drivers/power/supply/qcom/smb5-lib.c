@@ -768,6 +768,11 @@ int smblib_set_charge_param(struct smb_charger *chg,
 		if (val_u < param->min_u)
 			val_u = param->min_u;
 
+		if (param->step_u == 0) {
+			WARN_ONCE(1, "param %s has zero step_u\n", param->name);
+			return -EINVAL;
+		}
+
 		val_raw = (val_u - param->min_u) / param->step_u;
 	}
 
@@ -2528,10 +2533,19 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 			 * to report over voltage health
 			 */
 			if (chg->six_pin_step_charge_enable) {
-				if (effective_fv_uv == WARM_VFLOAT_UV)
+				if (effective_fv_uv == WARM_VFLOAT_UV) {
+					/*
+					 * JEITA reduces FCC in warm conditions;
+					 * 100mV buffer is sufficient.
+					 */
 					over_voltage_thr_uv = effective_fv_uv + 100000;
-				else
-					over_voltage_thr_uv = chg->batt_profile_fv_uv + 100000;
+				} else {
+					/*
+					 * Observed ~275mV transient IR drop spike at high SOC before taper
+					 * kicks in. Use 400mV buffer to account for battery aging (higher ESR).
+					 */
+					over_voltage_thr_uv = chg->batt_profile_fv_uv + 400000;
+				}
 			} else {
 				over_voltage_thr_uv = effective_fv_uv + 40000;
 			}
@@ -2719,7 +2733,8 @@ int smblib_set_prop_input_suspend(struct smb_charger *chg,
 		return rc;
 	}
 
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 	return rc;
 }
 
@@ -2728,7 +2743,8 @@ int smblib_set_prop_batt_capacity(struct smb_charger *chg,
 {
 	chg->fake_capacity = val->intval;
 
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 
 	return 0;
 }
@@ -2742,7 +2758,8 @@ int smblib_set_prop_batt_status(struct smb_charger *chg,
 	else
 		chg->fake_batt_status = -EINVAL;
 
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 
 	return 0;
 }
@@ -2989,7 +3006,7 @@ static int smblib_therm_charging(struct smb_charger *chg)
 int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
 			  const union power_supply_propval *val)
 {
-  int rc;
+	int rc = 0;
 
   smblib_dbg(chg, PR_MISC, "%s intval= %x\n",__FUNCTION__,val->intval);
 
@@ -5817,7 +5834,8 @@ irqreturn_t chg_state_change_irq_handler(int irq, void *data)
 	if (chg->wa_flags & CHG_TERMINATION_WA)
 		smblib_eval_chg_termination(chg, stat);
 
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 	return IRQ_HANDLED;
 }
 
@@ -5840,7 +5858,8 @@ irqreturn_t batt_temp_changed_irq_handler(int irq, void *data)
 	}
 
 	/* we still use old soft jeita method */
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 
 	return IRQ_HANDLED;
 }
@@ -5851,7 +5870,8 @@ irqreturn_t batt_psy_changed_irq_handler(int irq, void *data)
 	struct smb_charger *chg = irq_data->parent_data;
 
 	smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
-	power_supply_changed(chg->batt_psy);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
 	return IRQ_HANDLED;
 }
 
@@ -8065,7 +8085,7 @@ irqreturn_t wdog_snarl_irq_handler(int irq, void *data)
 		schedule_delayed_work(&chg->thermal_regulation_work, 0);
 	}
 
-	if (chg->step_chg_enabled)
+	if (chg->step_chg_enabled && chg->batt_psy)
 		power_supply_changed(chg->batt_psy);
 
 	return IRQ_HANDLED;
@@ -8083,7 +8103,7 @@ irqreturn_t wdog_bark_irq_handler(int irq, void *data)
 	if (rc < 0)
 		smblib_err(chg, "Couldn't pet the dog rc=%d\n", rc);
 
-	if (chg->step_chg_enabled || chg->sw_jeita_enabled)
+	if ((chg->step_chg_enabled || chg->sw_jeita_enabled) && chg->batt_psy)
 		power_supply_changed(chg->batt_psy);
 
 	return IRQ_HANDLED;
