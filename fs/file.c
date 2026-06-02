@@ -719,21 +719,39 @@ static inline void __range_cloexec(struct files_struct *cur_fds,
 static inline void __range_close(struct files_struct *cur_fds, unsigned int fd,
 				 unsigned int max_fd)
 {
-	while (fd <= max_fd) {
+	struct fdtable *fdt;
+	unsigned int n;
+
+	spin_lock(&cur_fds->file_lock);
+	fdt = files_fdtable(cur_fds);
+	n = last_fd(fdt);
+	max_fd = min(max_fd, n);
+
+	for (fd = find_next_bit(fdt->open_fds, max_fd + 1, fd);
+	     fd <= max_fd;
+	     fd = find_next_bit(fdt->open_fds, max_fd + 1, fd + 1)) {
 		struct file *file;
 
-		file = pick_file(cur_fds, fd++);
-		if (!IS_ERR(file)) {
-			/* found a valid file to close */
+		fd = array_index_nospec(fd, fdt->max_fds);
+		file = fdt->fd[fd];
+		if (file) {
+			rcu_assign_pointer(fdt->fd[fd], NULL);
+			__clear_close_on_exec(fd, fdt);
+			__put_unused_fd(cur_fds, fd);
+
+			spin_unlock(&cur_fds->file_lock);
 			filp_close(file, cur_fds);
 			cond_resched();
-			continue;
+			spin_lock(&cur_fds->file_lock);
+			fdt = files_fdtable(cur_fds);
+		} else if (need_resched()) {
+			spin_unlock(&cur_fds->file_lock);
+			cond_resched();
+			spin_lock(&cur_fds->file_lock);
+			fdt = files_fdtable(cur_fds);
 		}
-
-		/* beyond the last fd in that table */
-		if (PTR_ERR(file) == -EINVAL)
-			return;
 	}
+	spin_unlock(&cur_fds->file_lock);
 }
 
 /**
