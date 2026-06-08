@@ -978,6 +978,7 @@ void pm_system_irq_wakeup(unsigned int irq_number)
 	const char *name = "null";
 
 	if (pm_wakeup_irq == 0) {
+		log_irq_wakeup_reason(irq_number);
 		if (msm_show_resume_irq_mask) {
 			desc = irq_to_desc(irq_number);
 			if (desc == NULL)
