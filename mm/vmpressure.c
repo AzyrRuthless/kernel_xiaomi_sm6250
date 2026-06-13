@@ -465,8 +465,10 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg, bool tree,
 	 * for this @memcg rather than the whole subtree, and there
 	 * isn't and won't be any in-kernel user in a legacy cgroup.
 	 */
+#ifdef CONFIG_MEMCG
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) && !tree)
 		return;
+#endif
 
 	/*
 	 * Here we only want to account pressure that userland is able to
