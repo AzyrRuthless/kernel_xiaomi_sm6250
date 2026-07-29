@@ -751,6 +751,16 @@ static inline void inode_unlock_shared(struct inode *inode)
 	up_read(&inode->i_rwsem);
 }
 
+static inline int __must_check inode_lock_killable(struct inode *inode)
+{
+	return down_write_killable(&inode->i_rwsem);
+}
+
+static inline int __must_check inode_lock_shared_killable(struct inode *inode)
+{
+	return down_read_killable(&inode->i_rwsem);
+}
+
 static inline int inode_trylock(struct inode *inode)
 {
 	return down_write_trylock(&inode->i_rwsem);

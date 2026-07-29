@@ -3485,9 +3485,12 @@ static int do_last(struct nameidata *nd,
 		 */
 	}
 	if (open_flag & O_CREAT)
-		inode_lock(dir->d_inode);
+		error = inode_lock_killable(dir->d_inode);
 	else
-		inode_lock_shared(dir->d_inode);
+		error = inode_lock_shared_killable(dir->d_inode);
+	if (error)
+		goto out;
+
 	error = lookup_open(nd, &path, file, op, got_write, opened);
 	if (open_flag & O_CREAT)
 		inode_unlock(dir->d_inode);
