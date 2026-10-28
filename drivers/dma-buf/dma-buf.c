@@ -1463,10 +1463,12 @@ static void write_proc(struct seq_file *s, struct dma_proc *proc)
 		ktime_t elapmstime = ktime_ms_delta(ktime_get(), dmabuf->ktime);
 
 		elapmstime = ktime_divns(elapmstime, MSEC_PER_SEC);
+		spin_lock(&dmabuf->name_lock);
 		seq_printf(s, "%-8s\t%-8ld\t%-8lld\n",
-				dmabuf->name,
+				dmabuf->name ?: "",
 				dmabuf->size / SZ_1K,
 				elapmstime);
+		spin_unlock(&dmabuf->name_lock);
 	}
 }
 
