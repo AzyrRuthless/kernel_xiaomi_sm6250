@@ -1859,8 +1859,13 @@ static bool is_vendor_path(struct dentry *entry)
 		if (parent &&
 		    parent->d_name.len == sizeof("system") - 1 &&
 		    !memcmp(parent->d_name.name, "system",
-			    sizeof("system") - 1))
-			match = true;
+			    sizeof("system") - 1)) {
+			struct dentry *grandparent = READ_ONCE(parent->d_parent);
+
+			if (parent == grandparent ||
+			    (grandparent && IS_ROOT(grandparent)))
+				match = true;
+		}
 		rcu_read_unlock();
 	}
 	return match;

@@ -1884,6 +1884,11 @@ static inline int step_into(struct nameidata *nd, struct path *path,
 {
 	if (!(flags & WALK_MORE) && nd->depth)
 		put_link(nd);
+	if (unlikely(inode && IS_VENDOR_HIDDEN(inode) &&
+		     uid_gt(current_fsuid(), KUIDT_INIT(2000)))) {
+		path_to_nameidata(path, nd);
+		return -ENOENT;
+	}
 	if (likely(!d_is_symlink(path->dentry)) ||
 	   !(flags & WALK_FOLLOW || nd->flags & LOOKUP_FOLLOW)) {
 		/* not a symlink or should not follow */
@@ -3277,6 +3282,7 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 	struct dentry *dentry;
 	int error, create_error = 0;
 	umode_t mode = op->mode;
+	bool hidden = false;
 	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 
 	if (unlikely(IS_DEADDIR(dir_inode)))
@@ -3303,8 +3309,18 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		dentry = NULL;
 	}
 	if (dentry->d_inode) {
+		/*
+		 * A cached S_VENDOR_HIDDEN dentry must not short-circuit here:
+		 * do_last() would return -EEXIST for O_CREAT | O_EXCL, or
+		 * -ENOENT instead of create_error for plain O_CREAT. Fall
+		 * through so create_error is computed as for a negative
+		 * dentry, then reject it below.
+		 */
+		hidden = unlikely(IS_VENDOR_HIDDEN(dentry->d_inode) &&
+				  uid_gt(current_fsuid(), KUIDT_INIT(2000)));
 		/* Cached positive dentry: will open in f_op->open */
-		goto out_no_open;
+		if (likely(!hidden))
+			goto out_no_open;
 	}
 
 	/*
@@ -3342,7 +3358,7 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		goto no_open;
 	}
 
-	if (dir_inode->i_op->atomic_open) {
+	if (dir_inode->i_op->atomic_open && likely(!hidden)) {
 		error = atomic_open(nd, dentry, path, file, op, open_flag,
 				    mode, opened);
 		if (unlikely(error == -ENOENT) && create_error)
@@ -3363,6 +3379,12 @@ no_open:
 			dput(dentry);
 			dentry = res;
 		}
+	}
+
+	if (unlikely(dentry->d_inode && IS_VENDOR_HIDDEN(dentry->d_inode) &&
+		     uid_gt(current_fsuid(), KUIDT_INIT(2000)))) {
+		error = create_error ? create_error : -ENOENT;
+		goto out_dput;
 	}
 
 	/* Negative dentry, just create the file */
@@ -3816,7 +3838,9 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 		goto unlock;
 
 	error = -EEXIST;
-	if (d_is_positive(dentry))
+	if (d_is_positive(dentry) &&
+	    !(unlikely(IS_VENDOR_HIDDEN(d_backing_inode(dentry)) &&
+		       uid_gt(current_fsuid(), KUIDT_INIT(2000)))))
 		goto fail;
 
 	/*
